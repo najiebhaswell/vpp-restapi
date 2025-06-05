@@ -35,8 +35,8 @@ func listBondsHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
         defer ch.Close()
 
         bonds := []map[string]interface{}{}
-        req := &vppbond.BondDump{}
-        reply := &vppbond.BondDetails{}
+        req := &vppbond.SwInterfaceBondDump{}
+        reply := &vppbond.SwInterfaceBondDetails{}
         reqCtx := ch.SendMultiRequest(req)
         for {
             stop, err := reqCtx.ReceiveReply(reply)
@@ -50,11 +50,10 @@ func listBondsHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
             }
             bonds = append(bonds, map[string]interface{}{
                 "index":     uint32(reply.SwIfIndex),
-                "name":      string(reply.InterfaceName[:]),
+                "name":      reply.InterfaceName,
                 "mode":      reply.Mode.String(),
-                "admin_up":  reply.IsEnabled,
-                "link_up":   reply.IsUp,
-                "members":   len(reply.ActiveMembers),
+                "active_slaves": reply.ActiveSlaves,
+                "slaves":    reply.Slaves,
             })
         }
 
@@ -67,6 +66,8 @@ func createBondHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
     return func(c *gin.Context) {
         var config struct {
             Mode       string   `json:"mode"`
+            LbMode     string   `json:"lb_mode"`
+            ID         *uint32  `json:"id,omitempty"`
             Interfaces []uint32 `json:"interfaces"`
         }
         if err := c.ShouldBindJSON(&config); err != nil {
@@ -94,10 +95,32 @@ func createBondHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
             return
         }
 
-        req := &vppbond.BondCreate{
-            Mode:      mode,
-            UseCarrier: true,
+        var lb vppbond.BondLbAlgo
+        switch config.LbMode {
+        case "l2":
+            lb = vppbond.BOND_API_LB_ALGO_L2
+        case "l23":
+            lb = vppbond.BOND_API_LB_ALGO_L23
+        case "l34":
+            lb = vppbond.BOND_API_LB_ALGO_L34
+        case "":
+            lb = vppbond.BOND_API_LB_ALGO_L2 // default jika kosong
+        default:
+            c.JSON(http.StatusBadRequest, gin.H{"error": "invalid lb_mode", "details": "supported lb_mode: l2, l23, l34"})
+            return
         }
+
+        req := &vppbond.BondCreate{
+            Mode: mode,
+            Lb:   lb,
+        }
+        // Jika ID diberikan, gunakan, jika tidak biarkan default (0xFFFFFFFF) supaya VPP auto assign
+        if config.ID != nil {
+            req.ID = *config.ID
+        } else {
+            req.ID = 0xFFFFFFFF // default (biar VPP auto)
+        }
+
         reply := &vppbond.BondCreateReply{}
         if err := ch.SendRequest(req).ReceiveReply(reply); err != nil {
             log.Printf("API request failed: %v", err)
@@ -112,13 +135,13 @@ func createBondHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
 
         swIfIndex := reply.SwIfIndex
         for _, memberIdx := range config.Interfaces {
-            reqAdd := &vppbond.SwInterfaceBondEnslave{
-                SwIfIndex:  vppinterface_types.InterfaceIndex(memberIdx),
+            reqAdd := &vppbond.BondAddMember{
+                SwIfIndex:     vppinterface_types.InterfaceIndex(memberIdx),
                 BondSwIfIndex: swIfIndex,
-                IsPassive:  false,
+                IsPassive:     false,
                 IsLongTimeout: false,
             }
-            replyAdd := &vppbond.SwInterfaceBondEnslaveReply{}
+            replyAdd := &vppbond.BondAddMemberReply{}
             if err := ch.SendRequest(reqAdd).ReceiveReply(replyAdd); err != nil {
                 log.Printf("Add member failed: %v", err)
                 c.JSON(http.StatusInternalServerError, gin.H{"error": "add member failed", "details": err.Error()})
@@ -135,7 +158,6 @@ func createBondHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
         c.JSON(http.StatusCreated, gin.H{"message": "Bond created", "sw_if_index": swIfIndex})
     }
 }
-
 // addBondMemberHandler returns a handler to add a member to a bond interface.
 func addBondMemberHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
     return func(c *gin.Context) {
@@ -163,13 +185,13 @@ func addBondMemberHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
         }
         defer ch.Close()
 
-        req := &vppbond.SwInterfaceBondEnslave{
-            SwIfIndex:  vppinterface_types.InterfaceIndex(config.MemberIndex),
+        req := &vppbond.BondAddMember{
+            SwIfIndex:     vppinterface_types.InterfaceIndex(config.MemberIndex),
             BondSwIfIndex: vppinterface_types.InterfaceIndex(swIfIndex),
-            IsPassive:  false,
+            IsPassive:     false,
             IsLongTimeout: false,
         }
-        reply := &vppbond.SwInterfaceBondEnslaveReply{}
+        reply := &vppbond.BondAddMemberReply{}
         if err := ch.SendRequest(req).ReceiveReply(reply); err != nil {
             log.Printf("API request failed: %v", err)
             c.JSON(http.StatusInternalServerError, gin.H{"error": "API request failed", "details": err.Error()})

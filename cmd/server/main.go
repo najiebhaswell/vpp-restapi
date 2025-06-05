@@ -7,6 +7,8 @@ import (
     "vpp-restapi/internal/handler/bond"
     _interface "vpp-restapi/internal/handler/_interface"
     "vpp-restapi/internal/handler/version"
+    "vpp-restapi/internal/handler/lcpng"
+    "vpp-restapi/internal/handler/vlan"
 )
 
 func main() {
@@ -20,6 +22,8 @@ func main() {
     version.RegisterRoutes(r, vppClient)
     _interface.RegisterRoutes(r, vppClient)
     bond.RegisterRoutes(r, vppClient)
+    lcpng.RegisterRoutes(r, vppClient)
+    vlan.RegisterRoutes(r, vppClient)
     log.Println("Starting server on :8080")
     if err := r.Run(":8080"); err != nil {
         log.Fatalf("Failed to run server: %v", err)
