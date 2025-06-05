@@ -7,13 +7,10 @@ import (
     "strconv"
 
     "github.com/gin-gonic/gin"
-    api "go.fd.io/govpp/api"
     "go.fd.io/govpp/adapter/socketclient"
     "go.fd.io/govpp/core"
-    vppbond "vpp-restapi/binapi/bond"
     vppinterface "vpp-restapi/binapi/interface"
     "vpp-restapi/binapi/interface_types"
-    vpptap "vpp-restapi/binapi/tapv2"
     "vpp-restapi/binapi/vpe"
 )
 
@@ -37,7 +34,7 @@ func main() {
     // Endpoint untuk mendapatkan daftar antarmuka
     r.GET("/vpp/interfaces", interfacesHandler(conn))
 
-    // Endpoint untuk konfigurasi antarmuka (create/delete loopback, delete interface)
+    // Endpoint untuk konfigurasi antarmuka (create/delete loopback)
     r.POST("/vpp/interfaces/:index/config", configInterfaceHandler(conn))
 
     log.Println("Starting server on :8080")
@@ -101,14 +98,12 @@ func interfacesHandler(conn *core.Connection) gin.HandlerFunc {
             if stop {
                 break
             }
-            // Gunakan fallback untuk nama
+            // Gunakan InterfaceName jika tersedia, jika tidak gunakan fallback
             swIfIndex := uint32(reply.SwIfIndex)
-            name := fmt.Sprintf("interface-%d", swIfIndex)
-            // Asumsikan nama berdasarkan SwIfIndex dan konteks VPP
-            if swIfIndex == 0 {
-                name = "local0"
+            name := string(reply.InterfaceName)
+            if name == "" {
+                name = fmt.Sprintf("interface-%d", swIfIndex)
             }
-            log.Printf("Interface Details: SwIfIndex=%d, Name=%s, Type=%v, Flags=%d, MTU=%d", swIfIndex, name, reply.Type, reply.Flags, reply.LinkMtu)
             nameCache[swIfIndex] = name
             interfacesList = append(interfacesList, map[string]interface{}{
                 "index":     swIfIndex,
@@ -125,44 +120,6 @@ func interfacesHandler(conn *core.Connection) gin.HandlerFunc {
     }
 }
 
-func getInterfaceDetails(ch api.Channel, swIfIndex uint32) (*vppinterface.SwInterfaceDetails, error) {
-    req := &vppinterface.SwInterfaceDump{
-        SwIfIndex: interface_types.InterfaceIndex(swIfIndex),
-    }
-    reply := &vppinterface.SwInterfaceDetails{}
-    reqCtx := ch.SendMultiRequest(req)
-    stop, err := reqCtx.ReceiveReply(reply)
-    if err != nil {
-        return nil, fmt.Errorf("failed to dump interface: %v", err)
-    }
-    if stop {
-        return nil, fmt.Errorf("interface %d not found", swIfIndex)
-    }
-    log.Printf("Interface %d: Type=%v", swIfIndex, reply.Type)
-    return reply, nil
-}
-
-func inferInterfaceType(swIfIndex uint32) (string, string) {
-    // Mengembalikan jenis antarmuka dan nama berdasarkan SwIfIndex dan konvensi VPP
-    if swIfIndex == 0 {
-        return "local", "local0"
-    }
-    // Asumsikan jenis berdasarkan SwIfIndex dari output vppctl
-    // Sesuaikan dengan daftar antarmuka: loop0 (1), BondEthernet0 (2), tap0 (3), loop1 (4)
-    switch swIfIndex {
-    case 1:
-        return "loopback", "loop0"
-    case 2:
-        return "bond", "BondEthernet0"
-    case 3:
-        return "tap", "tap0"
-    case 4:
-        return "loopback", "loop1"
-    default:
-        return "unknown", fmt.Sprintf("interface-%d", swIfIndex)
-    }
-}
-
 func configInterfaceHandler(conn *core.Connection) gin.HandlerFunc {
     return func(c *gin.Context) {
         log.Println("Handling /vpp/interfaces/:index/config request")
@@ -174,7 +131,7 @@ func configInterfaceHandler(conn *core.Connection) gin.HandlerFunc {
         }
 
         var config struct {
-            Action string `json:"action"` // create_loopback, delete_interface
+            Action string `json:"action"` // create_loopback, delete_loopback
         }
         if err := c.ShouldBindJSON(&config); err != nil {
             log.Printf("Invalid request body: %v", err)
@@ -199,70 +156,22 @@ func configInterfaceHandler(conn *core.Connection) gin.HandlerFunc {
                 c.JSON(http.StatusInternalServerError, gin.H{"error": "API request failed", "details": err.Error()})
                 return
             }
-            log.Printf("Created loopback with SwIfIndex=%d", reply.SwIfIndex)
             c.JSON(http.StatusCreated, gin.H{"message": "Loopback created", "sw_if_index": reply.SwIfIndex})
 
-        case "delete_interface":
-            details, err := getInterfaceDetails(ch, uint32(swIfIndex))
-            if err != nil {
-                log.Printf("Failed to get interface details: %v", err)
-                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid interface", "details": err.Error()})
+        case "delete_loopback":
+            req := &vppinterface.DeleteLoopback{
+                SwIfIndex: interface_types.InterfaceIndex(swIfIndex),
+            }
+            reply := &vppinterface.DeleteLoopbackReply{}
+            if err := ch.SendRequest(req).ReceiveReply(reply); err != nil {
+                log.Printf("API request failed: %v", err)
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "API request failed", "details": err.Error()})
                 return
             }
-            // Tentukan jenis dan nama antarmuka
-            ifType, name := inferInterfaceType(uint32(swIfIndex))
-            // Cegah penghapusan local0
-            if ifType == "local" {
-                log.Printf("Cannot delete local0 interface")
-                c.JSON(http.StatusBadRequest, gin.H{"error": "cannot delete", "details": "local0 interface cannot be deleted"})
-                return
-            }
-            // Panggil API penghapusan berdasarkan tipe
-            switch ifType {
-            case "loopback":
-                req := &vppinterface.DeleteLoopback{
-                    SwIfIndex: interface_types.InterfaceIndex(swIfIndex),
-                }
-                reply := &vppinterface.DeleteLoopbackReply{}
-                if err := ch.SendRequest(req).ReceiveReply(reply); err != nil {
-                    log.Printf("API request failed: %v", err)
-                    c.JSON(http.StatusInternalServerError, gin.H{"error": "API request failed", "details": err.Error()})
-                    return
-                }
-                log.Printf("Deleted loopback interface %d (%s)", swIfIndex, name)
-                c.JSON(http.StatusOK, gin.H{"message": "Interface deleted", "name": name})
-            case "bond":
-                req := &vppbond.BondDelete{
-                    SwIfIndex: interface_types.InterfaceIndex(swIfIndex),
-                }
-                reply := &vppbond.BondDeleteReply{}
-                if err := ch.SendRequest(req).ReceiveReply(reply); err != nil {
-                    log.Printf("API request failed: %v", err)
-                    c.JSON(http.StatusInternalServerError, gin.H{"error": "API request failed", "details": err.Error()})
-                    return
-                }
-                log.Printf("Deleted bond interface %d (%s)", swIfIndex, name)
-                c.JSON(http.StatusOK, gin.H{"message": "Interface deleted", "name": name})
-            case "tap":
-                req := &vpptap.TapDeleteV2{
-                    SwIfIndex: interface_types.InterfaceIndex(swIfIndex),
-                }
-                reply := &vpptap.TapDeleteV2Reply{}
-                if err := ch.SendRequest(req).ReceiveReply(reply); err != nil {
-                    log.Printf("API request failed: %v", err)
-                    c.JSON(http.StatusInternalServerError, gin.H{"error": "API request failed", "details": err.Error()})
-                    return
-                }
-                log.Printf("Deleted tap interface %d (%s)", swIfIndex, name)
-                c.JSON(http.StatusOK, gin.H{"message": "Interface deleted", "name": name})
-            default:
-                log.Printf("Unsupported interface type for deletion: %s", ifType)
-                c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported interface", "details": fmt.Sprintf("interface %s (type %s) cannot be deleted", name, ifType)})
-                return
-            }
+            c.JSON(http.StatusOK, gin.H{"message": "Loopback deleted"})
 
         default:
-            c.JSON(http.StatusBadRequest, gin.H{"error": "invalid action", "details": "supported actions: create_loopback, delete_interface"})
+            c.JSON(http.StatusBadRequest, gin.H{"error": "invalid action", "details": "supported actions: create_loopback, delete_loopback"})
         }
     }
 }
