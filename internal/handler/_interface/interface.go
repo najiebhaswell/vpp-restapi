@@ -21,9 +21,67 @@ func RegisterRoutes(r *gin.Engine, vppClient *vppapi.VPPClient) {
         interfaceGroup.GET("", listInterfacesHandler(vppClient))
         interfaceGroup.POST("/loopback", createLoopbackHandler(vppClient))
         interfaceGroup.DELETE("/:sw_if_index", deleteInterfaceHandler(vppClient))
+        // Tambahan enable/disable
+        interfaceGroup.POST("/:sw_if_index/enable", enableInterfaceHandler(vppClient))
+        interfaceGroup.POST("/:sw_if_index/disable", disableInterfaceHandler(vppClient))
     }
 }
 
+// Handler untuk enable interface
+func enableInterfaceHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        swIfIndex, err := strconv.Atoi(c.Param("sw_if_index"))
+        if err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "invalid sw_if_index", "details": err.Error()})
+            return
+        }
+        ch, err := vppClient.NewAPIChannel()
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
+        defer ch.Close()
+
+        req := &vppinterface.SwInterfaceSetFlags{
+            SwIfIndex: vppinterface_types.InterfaceIndex(swIfIndex),
+            Flags:     vppinterface_types.IF_STATUS_API_FLAG_ADMIN_UP,
+        }
+        reply := &vppinterface.SwInterfaceSetFlagsReply{}
+        if err := ch.SendRequest(req).ReceiveReply(reply); err != nil || reply.Retval != 0 {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to enable interface", "details": err})
+            return
+        }
+        c.JSON(http.StatusOK, gin.H{"message": "Interface enabled"})
+    }
+}
+
+// Handler untuk disable interface
+func disableInterfaceHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        swIfIndex, err := strconv.Atoi(c.Param("sw_if_index"))
+        if err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "invalid sw_if_index", "details": err.Error()})
+            return
+        }
+        ch, err := vppClient.NewAPIChannel()
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
+        defer ch.Close()
+
+        req := &vppinterface.SwInterfaceSetFlags{
+            SwIfIndex: vppinterface_types.InterfaceIndex(swIfIndex),
+            Flags:     0, // Admin down
+        }
+        reply := &vppinterface.SwInterfaceSetFlagsReply{}
+        if err := ch.SendRequest(req).ReceiveReply(reply); err != nil || reply.Retval != 0 {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to disable interface", "details": err})
+            return
+        }
+        c.JSON(http.StatusOK, gin.H{"message": "Interface disabled"})
+    }
+}
 // listInterfacesHandler returns a handler to list all VPP interfaces.
 func listInterfacesHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
     return func(c *gin.Context) {
