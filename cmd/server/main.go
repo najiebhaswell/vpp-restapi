@@ -9,6 +9,9 @@ import (
     "vpp-restapi/internal/handler/version"
     "vpp-restapi/internal/handler/lcpng"
     "vpp-restapi/internal/handler/vlan"
+    "github.com/swaggo/gin-swagger"
+    "github.com/swaggo/files"
+    _ "vpp-restapi/docs" // <- tambahkan ini setelah generate swagger docs
 )
 
 func main() {
@@ -19,6 +22,7 @@ func main() {
     }
     defer vppClient.Close()
     r := gin.Default()
+    r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
     version.RegisterRoutes(r, vppClient)
     _interface.RegisterRoutes(r, vppClient)
     bond.RegisterRoutes(r, vppClient)

@@ -42,7 +42,15 @@ func RegisterRoutes(r *gin.Engine, vppClient *vppapi.VPPClient) {
     }
 }
 
-// Create VLAN Subinterface
+// @Summary Create VLAN Subinterface
+// @Description Create a VLAN subinterface with options.
+// @Tags vlan
+// @Accept json
+// @Produce json
+// @Param body body VLANCreateRequest true "VLAN Config"
+// @Success 201 {object} map[string]interface{}
+// @Failure 400,500 {object} map[string]interface{}
+// @Router /vpp/vlan/create [post]
 func createVLANHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
     return func(c *gin.Context) {
         var req VLANCreateRequest
@@ -106,7 +114,13 @@ func createVLANHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
     }
 }
 
-// Delete VLAN Subinterface
+// @Summary Delete VLAN Subinterface
+// @Description Delete a VLAN subinterface by sw_if_index.
+// @Tags vlan
+// @Param sw_if_index path int true "VLAN SwIfIndex"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400,500 {object} map[string]interface{}
+// @Router /vpp/vlan/{sw_if_index} [delete]
 func deleteVLANHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
     return func(c *gin.Context) {
         swIfIndex := c.Param("sw_if_index")
@@ -129,7 +143,14 @@ func deleteVLANHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
     }
 }
 
-// Enable/Disable VLAN
+// @Summary Enable VLAN
+// @Description Enable a VLAN interface by sw_if_index.
+// @Tags vlan
+// @Param sw_if_index path int true "VLAN SwIfIndex"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400,500 {object} map[string]interface{}
+// @Router /vpp/vlan/{sw_if_index}/enable [post]
+// @Router /vpp/vlan/{sw_if_index}/disable [post]
 func enableVLANHandler(vppClient *vppapi.VPPClient, enable bool) gin.HandlerFunc {
     return func(c *gin.Context) {
         swIfIndex := parseSwIfIndex(c.Param("sw_if_index"))
@@ -161,7 +182,16 @@ func enableVLANHandler(vppClient *vppapi.VPPClient, enable bool) gin.HandlerFunc
     }
 }
 
-// Set VLAN MTU
+// @Summary Set VLAN MTU
+// @Description Set the MTU of a VLAN interface.
+// @Tags vlan
+// @Accept json
+// @Produce json
+// @Param sw_if_index path int true "VLAN SwIfIndex"
+// @Param body body VLANActionRequest true "MTU Request"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400,500 {object} map[string]interface{}
+// @Router /vpp/vlan/{sw_if_index}/mtu [post]
 func setVLANMtuHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
     return func(c *gin.Context) {
         var req VLANActionRequest
@@ -189,7 +219,16 @@ func setVLANMtuHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
     }
 }
 
-// Set VLAN IP Address
+// @Summary Set VLAN IP Address
+// @Description Set the IP address of a VLAN interface.
+// @Tags vlan
+// @Accept json
+// @Produce json
+// @Param sw_if_index path int true "VLAN SwIfIndex"
+// @Param body body VLANActionRequest true "IP Request"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400,500 {object} map[string]interface{}
+// @Router /vpp/vlan/{sw_if_index}/ip [post]
 func setVLANIpHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
     return func(c *gin.Context) {
         var req VLANActionRequest

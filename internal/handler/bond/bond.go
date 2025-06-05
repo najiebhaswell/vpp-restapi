@@ -23,7 +23,12 @@ func RegisterRoutes(r *gin.Engine, vppClient *vppapi.VPPClient) {
     }
 }
 
-// listBondsHandler returns a handler to list all bond interfaces.
+// @Summary List Bond Interfaces
+// @Description List all bond interfaces.
+// @Tags bonds
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /vpp/bonds [get]
 func listBondsHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
     return func(c *gin.Context) {
         ch, err := vppClient.NewAPIChannel()
@@ -52,8 +57,11 @@ func listBondsHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
                 "index":     uint32(reply.SwIfIndex),
                 "name":      reply.InterfaceName,
                 "mode":      reply.Mode.String(),
-                "active_slaves": reply.ActiveSlaves,
-                "slaves":    reply.Slaves,
+                "lb_algo":   reply.Lb.String(),
+                "admin_up":  nil, // Not available in SwInterfaceBondDetails
+                "link_up":   nil, // Not available in SwInterfaceBondDetails
+                "members":   reply.Slaves,
+                "active":    reply.ActiveSlaves,
             })
         }
 
@@ -61,13 +69,19 @@ func listBondsHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
     }
 }
 
-// createBondHandler returns a handler to create a bond interface.
+// @Summary Create Bond Interface
+// @Description Create a new bond interface with members.
+// @Tags bonds
+// @Accept json
+// @Produce json
+// @Param body body object true "Bond Config {mode: string, interfaces: []int}"
+// @Success 201 {object} map[string]interface{}
+// @Failure 400,500 {object} map[string]interface{}
+// @Router /vpp/bonds [post]
 func createBondHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
     return func(c *gin.Context) {
         var config struct {
             Mode       string   `json:"mode"`
-            LbMode     string   `json:"lb_mode"`
-            ID         *uint32  `json:"id,omitempty"`
             Interfaces []uint32 `json:"interfaces"`
         }
         if err := c.ShouldBindJSON(&config); err != nil {
@@ -90,37 +104,20 @@ func createBondHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
             mode = vppbond.BOND_API_MODE_LACP
         case "round-robin":
             mode = vppbond.BOND_API_MODE_ROUND_ROBIN
+        case "xor":
+            mode = vppbond.BOND_API_MODE_XOR
+        case "active-backup":
+            mode = vppbond.BOND_API_MODE_ACTIVE_BACKUP
+        case "broadcast":
+            mode = vppbond.BOND_API_MODE_BROADCAST
         default:
-            c.JSON(http.StatusBadRequest, gin.H{"error": "invalid mode", "details": "supported modes: lacp, round-robin"})
-            return
-        }
-
-        var lb vppbond.BondLbAlgo
-        switch config.LbMode {
-        case "l2":
-            lb = vppbond.BOND_API_LB_ALGO_L2
-        case "l23":
-            lb = vppbond.BOND_API_LB_ALGO_L23
-        case "l34":
-            lb = vppbond.BOND_API_LB_ALGO_L34
-        case "":
-            lb = vppbond.BOND_API_LB_ALGO_L2 // default jika kosong
-        default:
-            c.JSON(http.StatusBadRequest, gin.H{"error": "invalid lb_mode", "details": "supported lb_mode: l2, l23, l34"})
+            c.JSON(http.StatusBadRequest, gin.H{"error": "invalid mode", "details": "supported modes: lacp, round-robin, xor, active-backup, broadcast"})
             return
         }
 
         req := &vppbond.BondCreate{
             Mode: mode,
-            Lb:   lb,
         }
-        // Jika ID diberikan, gunakan, jika tidak biarkan default (0xFFFFFFFF) supaya VPP auto assign
-        if config.ID != nil {
-            req.ID = *config.ID
-        } else {
-            req.ID = 0xFFFFFFFF // default (biar VPP auto)
-        }
-
         reply := &vppbond.BondCreateReply{}
         if err := ch.SendRequest(req).ReceiveReply(reply); err != nil {
             log.Printf("API request failed: %v", err)
@@ -158,7 +155,17 @@ func createBondHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
         c.JSON(http.StatusCreated, gin.H{"message": "Bond created", "sw_if_index": swIfIndex})
     }
 }
-// addBondMemberHandler returns a handler to add a member to a bond interface.
+
+// @Summary Add Bond Member
+// @Description Add a member to a bond interface.
+// @Tags bonds
+// @Accept json
+// @Produce json
+// @Param sw_if_index path int true "Bond Interface Index"
+// @Param body body object true "Member {member_index: int}"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400,500 {object} map[string]interface{}
+// @Router /vpp/bonds/{sw_if_index}/member [post]
 func addBondMemberHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
     return func(c *gin.Context) {
         swIfIndex, err := strconv.Atoi(c.Param("sw_if_index"))
@@ -208,7 +215,13 @@ func addBondMemberHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
     }
 }
 
-// deleteBondHandler returns a handler to delete a bond interface.
+// @Summary Delete Bond Interface
+// @Description Delete a bond interface by sw_if_index.
+// @Tags bonds
+// @Param sw_if_index path int true "Bond Interface Index"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400,500 {object} map[string]interface{}
+// @Router /vpp/bonds/{sw_if_index} [delete]
 func deleteBondHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
     return func(c *gin.Context) {
         swIfIndex, err := strconv.Atoi(c.Param("sw_if_index"))

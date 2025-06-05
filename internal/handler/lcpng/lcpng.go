@@ -9,6 +9,7 @@ import (
     vpp_lcp "vpp-restapi/binapi/lcpng_if"
 )
 
+// RegisterRoutes sets up the LCP-related HTTP routes.
 func RegisterRoutes(r *gin.Engine, vppClient *vppapi.VPPClient) {
     lcpGroup := r.Group("/vpp/lcp")
     {
@@ -16,6 +17,15 @@ func RegisterRoutes(r *gin.Engine, vppClient *vppapi.VPPClient) {
     }
 }
 
+// @Summary Mirror VPP Interface to Host
+// @Description Mirror a VPP interface (LCP pair) to the host's kernel namespace
+// @Tags lcp
+// @Accept json
+// @Produce json
+// @Param body body object true "Mirror Config {sw_if_index: int, host_if_name: string, host_if_type: string, netns: string}"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400,500 {object} map[string]interface{}
+// @Router /vpp/lcp/mirror [post]
 func mirrorInterfaceHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
     return func(c *gin.Context) {
         var reqBody struct {

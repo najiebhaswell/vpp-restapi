@@ -9,10 +9,17 @@ import (
     "vpp-restapi/internal/api"
 )
 
+// RegisterRoutes sets up the version-related HTTP routes.
 func RegisterRoutes(r *gin.Engine, vppClient *api.VPPClient) {
     r.GET("/vpp/version", getVersionHandler(vppClient))
 }
 
+// @Summary Show VPP version
+// @Description Get the running VPP version and build date
+// @Tags version
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /vpp/version [get]
 func getVersionHandler(vppClient *api.VPPClient) gin.HandlerFunc {
     return func(c *gin.Context) {
         log.Println("Handling /vpp/version request")

@@ -21,13 +21,18 @@ func RegisterRoutes(r *gin.Engine, vppClient *vppapi.VPPClient) {
         interfaceGroup.GET("", listInterfacesHandler(vppClient))
         interfaceGroup.POST("/loopback", createLoopbackHandler(vppClient))
         interfaceGroup.DELETE("/:sw_if_index", deleteInterfaceHandler(vppClient))
-        // Tambahan enable/disable
         interfaceGroup.POST("/:sw_if_index/enable", enableInterfaceHandler(vppClient))
         interfaceGroup.POST("/:sw_if_index/disable", disableInterfaceHandler(vppClient))
     }
 }
 
-// Handler untuk enable interface
+// @Summary Enable interface
+// @Description Set interface to admin up.
+// @Tags interfaces
+// @Param sw_if_index path int true "Interface Index"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400,500 {object} map[string]interface{}
+// @Router /vpp/interfaces/{sw_if_index}/enable [post]
 func enableInterfaceHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
     return func(c *gin.Context) {
         swIfIndex, err := strconv.Atoi(c.Param("sw_if_index"))
@@ -55,7 +60,13 @@ func enableInterfaceHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
     }
 }
 
-// Handler untuk disable interface
+// @Summary Disable interface
+// @Description Set interface to admin down.
+// @Tags interfaces
+// @Param sw_if_index path int true "Interface Index"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400,500 {object} map[string]interface{}
+// @Router /vpp/interfaces/{sw_if_index}/disable [post]
 func disableInterfaceHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
     return func(c *gin.Context) {
         swIfIndex, err := strconv.Atoi(c.Param("sw_if_index"))
@@ -82,7 +93,13 @@ func disableInterfaceHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
         c.JSON(http.StatusOK, gin.H{"message": "Interface disabled"})
     }
 }
-// listInterfacesHandler returns a handler to list all VPP interfaces.
+
+// @Summary List all interfaces
+// @Description Get all VPP interfaces with status.
+// @Tags interfaces
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /vpp/interfaces [get]
 func listInterfacesHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
     return func(c *gin.Context) {
         ch, err := vppClient.NewAPIChannel()
@@ -122,7 +139,15 @@ func listInterfacesHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
     }
 }
 
-// createLoopbackHandler returns a handler to create a loopback interface.
+// @Summary Create Loopback Interface
+// @Description Create a new loopback interface.
+// @Tags interfaces
+// @Accept json
+// @Produce json
+// @Param body body object true "Loopback Config {mac_address: string}"
+// @Success 201 {object} map[string]interface{}
+// @Failure 400,500 {object} map[string]interface{}
+// @Router /vpp/interfaces/loopback [post]
 func createLoopbackHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
     return func(c *gin.Context) {
         var config struct {
@@ -171,7 +196,13 @@ func createLoopbackHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
     }
 }
 
-// deleteInterfaceHandler returns a handler to delete a loopback or bond interface.
+// @Summary Delete Interface
+// @Description Delete a loopback or bond interface by sw_if_index.
+// @Tags interfaces
+// @Param sw_if_index path int true "Interface Index"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400,500 {object} map[string]interface{}
+// @Router /vpp/interfaces/{sw_if_index} [delete]
 func deleteInterfaceHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
     return func(c *gin.Context) {
         swIfIndex, err := strconv.Atoi(c.Param("sw_if_index"))
@@ -246,6 +277,7 @@ func deleteInterfaceHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
         }
     }
 }
+
 // inferInterfaceType infers the interface type based on SwInterfaceDetails.
 func inferInterfaceType(details *vppinterface.SwInterfaceDetails) string {
     name := string(details.InterfaceName[:])
