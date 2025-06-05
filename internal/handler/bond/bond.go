@@ -70,19 +70,23 @@ func listBondsHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
 }
 
 // @Summary Create Bond Interface
-// @Description Create a new bond interface with members.
+// @Description Create a new bond interface (multi-bond supported, id required for unique bond).
 // @Tags bonds
 // @Accept json
 // @Produce json
-// @Param body body object true "Bond Config {mode: string, interfaces: []int}"
+// @Param body body object true "Bond Config {mode: string, interfaces: []int, id: int (optional), mac_address: string (optional), lb: string (optional), numa_only: bool (optional)}"
 // @Success 201 {object} map[string]interface{}
 // @Failure 400,500 {object} map[string]interface{}
 // @Router /vpp/bonds [post]
 func createBondHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
     return func(c *gin.Context) {
         var config struct {
-            Mode       string   `json:"mode"`
-            Interfaces []uint32 `json:"interfaces"`
+            Mode        string   `json:"mode"`
+            Interfaces  []uint32 `json:"interfaces"`
+            Id          *uint32  `json:"id,omitempty"`           // PATCH: add id
+            MacAddress  string   `json:"mac_address,omitempty"`  // PATCH: add mac_address (optional)
+            Lb          string   `json:"lb,omitempty"`           // PATCH: add load-balance mode (optional)
+            NumaOnly    *bool    `json:"numa_only,omitempty"`    // PATCH: add numa_only (optional)
         }
         if err := c.ShouldBindJSON(&config); err != nil {
             log.Printf("Invalid request body: %v", err)
@@ -115,9 +119,43 @@ func createBondHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
             return
         }
 
+        // Build BondCreate request
         req := &vppbond.BondCreate{
             Mode: mode,
         }
+        // PATCH: support id
+        if config.Id != nil {
+            req.ID = *config.Id
+        }
+        // PATCH: support mac_address
+        if config.MacAddress != "" {
+            copy(req.MacAddress[:], parseMacString(config.MacAddress))
+            req.UseCustomMac = true
+        }
+        // PATCH: support lb
+        if config.Lb != "" {
+            switch config.Lb {
+            case "l2":
+                req.Lb = vppbond.BOND_API_LB_ALGO_L2
+            case "l34":
+                req.Lb = vppbond.BOND_API_LB_ALGO_L34
+            case "l23":
+                req.Lb = vppbond.BOND_API_LB_ALGO_L23
+            case "rr":
+                req.Lb = vppbond.BOND_API_LB_ALGO_RR
+            case "bc":
+                req.Lb = vppbond.BOND_API_LB_ALGO_BC
+            case "ab":
+                req.Lb = vppbond.BOND_API_LB_ALGO_AB
+            default:
+                // if unknown, ignore
+            }
+        }
+        // PATCH: support numa_only
+        if config.NumaOnly != nil {
+            req.NumaOnly = *config.NumaOnly
+        }
+
         reply := &vppbond.BondCreateReply{}
         if err := ch.SendRequest(req).ReceiveReply(reply); err != nil {
             log.Printf("API request failed: %v", err)
@@ -154,6 +192,13 @@ func createBondHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
         log.Printf("Created bond with SwIfIndex=%d", swIfIndex)
         c.JSON(http.StatusCreated, gin.H{"message": "Bond created", "sw_if_index": swIfIndex})
     }
+}
+
+// Helper: convert MAC string to [6]byte for VPP
+func parseMacString(mac string) []byte {
+    var b [6]byte
+    fmt.Sscanf(mac, "%x:%x:%x:%x:%x:%x", &b[0], &b[1], &b[2], &b[3], &b[4], &b[5])
+    return b[:]
 }
 
 // @Summary Add Bond Member

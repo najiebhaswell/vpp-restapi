@@ -25,6 +25,7 @@ func main() {
     r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
     version.RegisterRoutes(r, vppClient)
     _interface.RegisterRoutes(r, vppClient)
+    _interface.RegisterConfigRoutes(r, vppClient)
     bond.RegisterRoutes(r, vppClient)
     lcpng.RegisterRoutes(r, vppClient)
     vlan.RegisterRoutes(r, vppClient)
