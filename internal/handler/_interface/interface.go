@@ -3,6 +3,7 @@ package _interface
 import (
     "fmt"
     "log"
+    "net"
     "net/http"
     "strconv"
     "strings"
@@ -11,6 +12,7 @@ import (
     vppinterface "vpp-restapi/binapi/interface"
     vppinterface_types "vpp-restapi/binapi/interface_types"
     vppbond "vpp-restapi/binapi/bond"
+    vppip "vpp-restapi/binapi/ip"
     vppapi "vpp-restapi/internal/api"
 )
 
@@ -94,8 +96,19 @@ func disableInterfaceHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
     }
 }
 
+// Helper to convert array IP to net.IP
+func ip4ToNetIP(a [4]byte) net.IP {
+    return net.IP{a[0], a[1], a[2], a[3]}
+}
+func ip6ToNetIP(a [16]byte) net.IP {
+    return net.IP{
+        a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7],
+        a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15],
+    }
+}
+
 // @Summary List all interfaces
-// @Description Get all VPP interfaces with status.
+// @Description Get all VPP interfaces with status and IP addresses.
 // @Tags interfaces
 // @Success 200 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
@@ -125,13 +138,51 @@ func listInterfacesHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
                 break
             }
             interfaceType := inferInterfaceType(reply)
+
+            ipAddresses := []string{}
+            for _, isIPv6 := range []bool{false, true} {
+                // Open a new channel for each address dump to avoid GoVPP reply warnings
+                ipCh, err := vppClient.NewAPIChannel()
+                if err != nil {
+                    continue
+                }
+                defer ipCh.Close()
+
+                ipReq := &vppip.IPAddressDump{
+                    SwIfIndex: reply.SwIfIndex,
+                    IsIPv6:    isIPv6,
+                }
+                ipReply := &vppip.IPAddressDetails{}
+                ipCtx := ipCh.SendMultiRequest(ipReq)
+                for {
+                    stopAddr, err := ipCtx.ReceiveReply(ipReply)
+                    if err != nil {
+                        break // skip jika error
+                    }
+                    if stopAddr {
+                        break
+                    }
+                    prefix := ipReply.Prefix
+                    var ipnet net.IPNet
+                    if isIPv6 {
+                        ipnet.IP = ip6ToNetIP(prefix.Address.Un.GetIP6())
+                        ipnet.Mask = net.CIDRMask(int(prefix.Len), 128)
+                    } else {
+                        ipnet.IP = ip4ToNetIP(prefix.Address.Un.GetIP4())
+                        ipnet.Mask = net.CIDRMask(int(prefix.Len), 32)
+                    }
+                    ipAddresses = append(ipAddresses, ipnet.String())
+                }
+            }
+
             interfaces = append(interfaces, map[string]interface{}{
-                "index":     uint32(reply.SwIfIndex),
-                "name":      string(reply.InterfaceName[:]),
-                "type":      interfaceType,
-                "admin_up":  (reply.Flags & vppinterface_types.IF_STATUS_API_FLAG_ADMIN_UP) != 0,
-                "link_up":   (reply.Flags & vppinterface_types.IF_STATUS_API_FLAG_LINK_UP) != 0,
-                "mtu":       reply.Mtu[0], // Use L3 MTU
+                "index":        uint32(reply.SwIfIndex),
+                "name":         string(reply.InterfaceName[:]),
+                "type":         interfaceType,
+                "admin_up":     (reply.Flags & vppinterface_types.IF_STATUS_API_FLAG_ADMIN_UP) != 0,
+                "link_up":      (reply.Flags & vppinterface_types.IF_STATUS_API_FLAG_LINK_UP) != 0,
+                "mtu":          reply.Mtu[0], // Use L3 MTU
+                "ip_addresses": ipAddresses,
             })
         }
 
