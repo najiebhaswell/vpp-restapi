@@ -11,7 +11,8 @@ import (
     "vpp-restapi/internal/handler/vlan"
     "github.com/swaggo/gin-swagger"
     "github.com/swaggo/files"
-    _ "vpp-restapi/docs" // <- tambahkan ini setelah generate swagger docs
+    _ "vpp-restapi/docs"
+    "vpp-restapi/internal/middleware"
 )
 
 func main() {
@@ -22,13 +23,26 @@ func main() {
     }
     defer vppClient.Close()
     r := gin.Default()
+    const myToken = "AexDQ4RyPi3jYETDHYFIxfFeQztzxBFoH3zZXGTTk0cI0RZqpzbqXM3epOeIOHik"
+    auth := middleware.AuthMiddleware(myToken)
+
+    // Swagger tanpa Auth
     r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-    version.RegisterRoutes(r, vppClient)
-    _interface.RegisterRoutes(r, vppClient)
-    _interface.RegisterConfigRoutes(r, vppClient)
-    bond.RegisterRoutes(r, vppClient)
-    lcpng.RegisterRoutes(r, vppClient)
-    vlan.RegisterRoutes(r, vppClient)
+
+    // API group dengan auth
+    apiGroup := r.Group("/vpp", auth)
+    version.RegisterRoutes(apiGroup, vppClient)
+    _interface.RegisterRoutes(apiGroup, vppClient)
+    _interface.RegisterConfigRoutes(apiGroup, vppClient)
+    bond.RegisterRoutes(apiGroup, vppClient)
+    lcpng.RegisterRoutes(apiGroup, vppClient)
+    vlan.RegisterRoutes(apiGroup, vppClient)
+
+    // DEBUG: Print all registered routes
+    for _, ri := range r.Routes() {
+        log.Printf("REGISTERED ROUTE: %s %s", ri.Method, ri.Path)
+    }
+
     log.Println("Starting server on :8080")
     if err := r.Run(":8080"); err != nil {
         log.Fatalf("Failed to run server: %v", err)

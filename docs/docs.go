@@ -14,6 +14,19 @@ const docTemplate = `{
     },
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
+    "securityDefinitions": {
+        "BearerAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header",
+            "description": "Masukkan token Bearer Anda pada header Authorization. Format: Bearer <token>"
+        }
+    },
+    "security": [
+        {
+            "BearerAuth": []
+        }
+    ],
     "paths": {
         "/vpp/bonds": {
             "get": {
@@ -22,6 +35,11 @@ const docTemplate = `{
                     "bonds"
                 ],
                 "summary": "List Bond Interfaces",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -51,6 +69,11 @@ const docTemplate = `{
                     "bonds"
                 ],
                 "summary": "Create Bond Interface",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "parameters": [
                     {
                         "description": "Bond Config {mode: string, interfaces: []int}",
@@ -94,6 +117,11 @@ const docTemplate = `{
                     "bonds"
                 ],
                 "summary": "Delete Bond Interface",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "parameters": [
                     {
                         "type": "integer",
@@ -141,6 +169,11 @@ const docTemplate = `{
                     "bonds"
                 ],
                 "summary": "Add Bond Member",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "parameters": [
                     {
                         "type": "integer",
@@ -191,6 +224,11 @@ const docTemplate = `{
                     "interfaces"
                 ],
                 "summary": "List all interfaces",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -222,6 +260,11 @@ const docTemplate = `{
                     "interfaces"
                 ],
                 "summary": "Create Loopback Interface",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "parameters": [
                     {
                         "description": "Loopback Config {mac_address: string}",
@@ -265,6 +308,11 @@ const docTemplate = `{
                     "interfaces"
                 ],
                 "summary": "Delete Interface",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "parameters": [
                     {
                         "type": "integer",
@@ -306,6 +354,11 @@ const docTemplate = `{
                     "interfaces"
                 ],
                 "summary": "Disable interface",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "parameters": [
                     {
                         "type": "integer",
@@ -347,6 +400,11 @@ const docTemplate = `{
                     "interfaces"
                 ],
                 "summary": "Enable interface",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "parameters": [
                     {
                         "type": "integer",
@@ -394,6 +452,11 @@ const docTemplate = `{
                     "lcp"
                 ],
                 "summary": "Mirror VPP Interface to Host",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "parameters": [
                     {
                         "description": "Mirror Config {sw_if_index: int, host_if_name: string, host_if_type: string, netns: string}",
@@ -437,6 +500,11 @@ const docTemplate = `{
                     "version"
                 ],
                 "summary": "Show VPP version",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -468,6 +536,11 @@ const docTemplate = `{
                     "vlan"
                 ],
                 "summary": "Create VLAN Subinterface",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "parameters": [
                     {
                         "description": "VLAN Config",
@@ -511,6 +584,11 @@ const docTemplate = `{
                     "vlan"
                 ],
                 "summary": "Delete VLAN Subinterface",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "parameters": [
                     {
                         "type": "integer",
@@ -552,6 +630,11 @@ const docTemplate = `{
                     "vlan"
                 ],
                 "summary": "Enable VLAN",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "parameters": [
                     {
                         "type": "integer",
@@ -593,6 +676,11 @@ const docTemplate = `{
                     "vlan"
                 ],
                 "summary": "Enable VLAN",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "parameters": [
                     {
                         "type": "integer",
@@ -640,6 +728,11 @@ const docTemplate = `{
                     "vlan"
                 ],
                 "summary": "Set VLAN IP Address",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "parameters": [
                     {
                         "type": "integer",
@@ -696,6 +789,11 @@ const docTemplate = `{
                     "vlan"
                 ],
                 "summary": "Set VLAN MTU",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "parameters": [
                     {
                         "type": "integer",
@@ -792,7 +890,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "",
 	Schemes:          []string{},
 	Title:            "",
-	Description:      "",
+	Description:      "API ini memerlukan Bearer Token pada header Authorization untuk setiap request ke endpoint /vpp/*.\n\nTambahkan header berikut pada setiap request:\n\n    Authorization: Bearer <token-anda>\n",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

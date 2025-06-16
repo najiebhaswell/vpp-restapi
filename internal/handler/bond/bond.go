@@ -13,14 +13,12 @@ import (
 )
 
 // RegisterRoutes sets up the bond-related HTTP routes.
-func RegisterRoutes(r *gin.Engine, vppClient *vppapi.VPPClient) {
-    bondGroup := r.Group("/vpp/bonds")
-    {
-        bondGroup.GET("", listBondsHandler(vppClient))
-        bondGroup.POST("", createBondHandler(vppClient))
-        bondGroup.POST("/:sw_if_index/member", addBondMemberHandler(vppClient))
-        bondGroup.DELETE("/:sw_if_index", deleteBondHandler(vppClient))
-    }
+// Sekarang menerima gin.IRoutes, tanpa membuat group di sini.
+func RegisterRoutes(r gin.IRoutes, vppClient *vppapi.VPPClient) {
+    r.GET("/bonds", listBondsHandler(vppClient))
+    r.POST("/bonds", createBondHandler(vppClient))
+    r.POST("/bonds/:sw_if_index/member", addBondMemberHandler(vppClient))
+    r.DELETE("/bonds/:sw_if_index", deleteBondHandler(vppClient))
 }
 
 // @Summary List Bond Interfaces
@@ -83,10 +81,10 @@ func createBondHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
         var config struct {
             Mode        string   `json:"mode"`
             Interfaces  []uint32 `json:"interfaces"`
-            Id          *uint32  `json:"id,omitempty"`           // PATCH: add id
-            MacAddress  string   `json:"mac_address,omitempty"`  // PATCH: add mac_address (optional)
-            Lb          string   `json:"lb,omitempty"`           // PATCH: add load-balance mode (optional)
-            NumaOnly    *bool    `json:"numa_only,omitempty"`    // PATCH: add numa_only (optional)
+            Id          *uint32  `json:"id,omitempty"`
+            MacAddress  string   `json:"mac_address,omitempty"`
+            Lb          string   `json:"lb,omitempty"`
+            NumaOnly    *bool    `json:"numa_only,omitempty"`
         }
         if err := c.ShouldBindJSON(&config); err != nil {
             log.Printf("Invalid request body: %v", err)
@@ -119,20 +117,16 @@ func createBondHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
             return
         }
 
-        // Build BondCreate request
         req := &vppbond.BondCreate{
             Mode: mode,
         }
-        // PATCH: support id
         if config.Id != nil {
             req.ID = *config.Id
         }
-        // PATCH: support mac_address
         if config.MacAddress != "" {
             copy(req.MacAddress[:], parseMacString(config.MacAddress))
             req.UseCustomMac = true
         }
-        // PATCH: support lb
         if config.Lb != "" {
             switch config.Lb {
             case "l2":
@@ -151,7 +145,6 @@ func createBondHandler(vppClient *vppapi.VPPClient) gin.HandlerFunc {
                 // if unknown, ignore
             }
         }
-        // PATCH: support numa_only
         if config.NumaOnly != nil {
             req.NumaOnly = *config.NumaOnly
         }

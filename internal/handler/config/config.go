@@ -8,7 +8,7 @@ import (
     "net/http"
 )
 
-func RegisterConfigRoutes(r *gin.Engine, vppClient *api.VPPClient) {
+func RegisterConfigRoutes(r gin.IRoutes, vppClient *api.VPPClient) {
     r.GET("/vpp/interfaces/config", getInterfacesConfigHandler(vppClient))
 }
 

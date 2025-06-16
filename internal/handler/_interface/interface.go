@@ -17,15 +17,13 @@ import (
 )
 
 // RegisterRoutes sets up the interface-related HTTP routes.
-func RegisterRoutes(r *gin.Engine, vppClient *vppapi.VPPClient) {
-    interfaceGroup := r.Group("/vpp/interfaces")
-    {
-        interfaceGroup.GET("", listInterfacesHandler(vppClient))
-        interfaceGroup.POST("/loopback", createLoopbackHandler(vppClient))
-        interfaceGroup.DELETE("/:sw_if_index", deleteInterfaceHandler(vppClient))
-        interfaceGroup.POST("/:sw_if_index/enable", enableInterfaceHandler(vppClient))
-        interfaceGroup.POST("/:sw_if_index/disable", disableInterfaceHandler(vppClient))
-    }
+// PATCH: gunakan gin.IRoutes, daftarkan endpoint tanpa membuat group di sini
+func RegisterRoutes(r gin.IRoutes, vppClient *vppapi.VPPClient) {
+    r.GET("/interfaces", listInterfacesHandler(vppClient))
+    r.POST("/interfaces/loopback", createLoopbackHandler(vppClient))
+    r.DELETE("/interfaces/:sw_if_index", deleteInterfaceHandler(vppClient))
+    r.POST("/interfaces/:sw_if_index/enable", enableInterfaceHandler(vppClient))
+    r.POST("/interfaces/:sw_if_index/disable", disableInterfaceHandler(vppClient))
 }
 
 // @Summary Enable interface

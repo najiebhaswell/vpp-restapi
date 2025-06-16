@@ -10,11 +10,9 @@ import (
 )
 
 // RegisterRoutes sets up the LCP-related HTTP routes.
-func RegisterRoutes(r *gin.Engine, vppClient *vppapi.VPPClient) {
-    lcpGroup := r.Group("/vpp/lcp")
-    {
-        lcpGroup.POST("/mirror", mirrorInterfaceHandler(vppClient))
-    }
+// Sekarang menerima gin.IRoutes, tanpa membuat group di sini.
+func RegisterRoutes(r gin.IRoutes, vppClient *vppapi.VPPClient) {
+    r.POST("/lcp/mirror", mirrorInterfaceHandler(vppClient))
 }
 
 // @Summary Mirror VPP Interface to Host

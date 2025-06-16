@@ -30,16 +30,14 @@ type VLANActionRequest struct {
 }
 
 // RegisterRoutes sets up the VLAN HTTP routes
-func RegisterRoutes(r *gin.Engine, vppClient *vppapi.VPPClient) {
-    vlanGroup := r.Group("/vpp/vlan")
-    {
-        vlanGroup.POST("/create", createVLANHandler(vppClient))
-        vlanGroup.DELETE("/:sw_if_index", deleteVLANHandler(vppClient))
-        vlanGroup.POST("/:sw_if_index/enable", enableVLANHandler(vppClient, true))
-        vlanGroup.POST("/:sw_if_index/disable", enableVLANHandler(vppClient, false))
-        vlanGroup.POST("/:sw_if_index/mtu", setVLANMtuHandler(vppClient))
-        vlanGroup.POST("/:sw_if_index/ip", setVLANIpHandler(vppClient))
-    }
+// PATCH: gunakan gin.IRoutes dan daftarkan endpoint tanpa membuat group di sini
+func RegisterRoutes(r gin.IRoutes, vppClient *vppapi.VPPClient) {
+    r.POST("/vlan/create", createVLANHandler(vppClient))
+    r.DELETE("/vlan/:sw_if_index", deleteVLANHandler(vppClient))
+    r.POST("/vlan/:sw_if_index/enable", enableVLANHandler(vppClient, true))
+    r.POST("/vlan/:sw_if_index/disable", enableVLANHandler(vppClient, false))
+    r.POST("/vlan/:sw_if_index/mtu", setVLANMtuHandler(vppClient))
+    r.POST("/vlan/:sw_if_index/ip", setVLANIpHandler(vppClient))
 }
 
 // @Summary Create VLAN Subinterface

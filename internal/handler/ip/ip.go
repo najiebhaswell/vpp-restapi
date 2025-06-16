@@ -5,6 +5,6 @@ import (
     "vpp-restapi/internal/api"
 )
 
-func RegisterRoutes(r *gin.Engine, vppClient *api.VPPClient) {
+func RegisterRoutes(r gin.IRoutes, vppClient *api.VPPClient) {
     // Placeholder untuk endpoint IP
 }

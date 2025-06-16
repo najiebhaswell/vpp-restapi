@@ -10,8 +10,8 @@ import (
 )
 
 // RegisterRoutes sets up the version-related HTTP routes.
-func RegisterRoutes(r *gin.Engine, vppClient *api.VPPClient) {
-    r.GET("/vpp/version", getVersionHandler(vppClient))
+func RegisterRoutes(r gin.IRoutes, vppClient *api.VPPClient) {
+    r.GET("/version", getVersionHandler(vppClient))
 }
 
 // @Summary Show VPP version
