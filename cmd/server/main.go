@@ -2,7 +2,9 @@ package main
 
 import (
     "log"
+
     "github.com/gin-gonic/gin"
+    "github.com/gin-contrib/cors"
     "vpp-restapi/internal/api"
     "vpp-restapi/internal/handler/bond"
     _interface "vpp-restapi/internal/handler/_interface"
@@ -23,6 +25,11 @@ func main() {
     }
     defer vppClient.Close()
     r := gin.Default()
+
+    // === Tambahkan CORS Middleware DI SINI ===
+    r.Use(cors.Default())
+    // ==========================================
+
     const myToken = "AexDQ4RyPi3jYETDHYFIxfFeQztzxBFoH3zZXGTTk0cI0RZqpzbqXM3epOeIOHik"
     auth := middleware.AuthMiddleware(myToken)
 
