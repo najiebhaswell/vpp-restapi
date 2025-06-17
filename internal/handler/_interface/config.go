@@ -29,12 +29,15 @@ func getInterfacesConfigHandler(vppClient *api.VPPClient) gin.HandlerFunc {
         lcpReply := &lcptype.LcpItfPairDetails{}
         lcpCtx := ch.SendMultiRequest(lcpReq)
         lcpMap := map[uint32]string{}
+        hostIfMap := map[uint32]string{} // PATCH: simpan mapping sw_if_index -> host_if_name
         for {
             stop, err := lcpCtx.ReceiveReply(lcpReply)
             if err != nil || stop {
                 break
             }
             lcpMap[uint32(lcpReply.PhySwIfIndex)] = lcpReply.HostIfName
+            hostIfMap[uint32(lcpReply.PhySwIfIndex)] = lcpReply.HostIfName // PATCH
+            // lcpReply.HostSwIfIndex juga dapat dipakai jika ingin mapping dua arah
         }
 
         // --- Ambil data bond ---
@@ -101,6 +104,14 @@ func getInterfacesConfigHandler(vppClient *api.VPPClient) gin.HandlerFunc {
             // --- Tambahkan lcp jika ada ---
             if lcp, ok := lcpMap[uint32(reply.SwIfIndex)]; ok && lcp != "" {
                 iface["lcp"] = lcp
+                iface["host_if_name"] = lcp // PATCH: tampilkan nama tap/host interface hasil mirror
+            }
+
+            // PATCH: Jika interface adalah tap hasil mirror, tambahkan host_if_name juga
+            for _, hostIfName := range hostIfMap {
+                if name == hostIfName {
+                    iface["is_host_if"] = true
+                }
             }
 
             // --- Tambahkan detail bond jika ini bond ---
