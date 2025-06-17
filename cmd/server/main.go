@@ -2,6 +2,7 @@ package main
 
 import (
     "log"
+    "time"
 
     "github.com/gin-gonic/gin"
     "github.com/gin-contrib/cors"
@@ -26,9 +27,15 @@ func main() {
     defer vppClient.Close()
     r := gin.Default()
 
-    // === Tambahkan CORS Middleware DI SINI ===
-    r.Use(cors.Default())
-    // ==========================================
+    // PATCH: CORS CUSTOM - izinkan Authorization header
+    r.Use(cors.New(cors.Config{
+        AllowOrigins:     []string{"*"},
+        AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+        AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+        ExposeHeaders:    []string{"Content-Length"},
+        AllowCredentials: false,
+        MaxAge: 12 * time.Hour,
+    }))
 
     const myToken = "AexDQ4RyPi3jYETDHYFIxfFeQztzxBFoH3zZXGTTk0cI0RZqpzbqXM3epOeIOHik"
     auth := middleware.AuthMiddleware(myToken)
